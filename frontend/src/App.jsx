@@ -1,14 +1,40 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { supabase } from "./supabase"
 
 function App() {
 
   const [page, setPage] = useState("landing")
   const [role, setRole] = useState(null)
+  const [userName, setUserName] = useState("")
   const [selectedGem, setSelectedGem] = useState(null)
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
 
+  // ✅ AUTO RESTORE SESSION ON LOAD
+  useEffect(() => {
+    const checkUser = async () => {
+      const { data } = await supabase.auth.getUser()
+
+      if (data?.user) {
+        setIsAuthenticated(true)
+        setUserName(data.user.user_metadata?.full_name || "")
+      }
+    }
+
+    checkUser()
+  }, [])
+
+  // ✅ LOGOUT
+  const handleLogout = async () => {
+    await supabase.auth.signOut()
+    setIsAuthenticated(false)
+    setUserName("")
+    setPage("landing")
+    setRole(null)
+    setSelectedGem(null)
+  }
 
   /* -------- ROUTING LOGIC -------- */
-//comment
+
   if (page === "signup" || page === "login") {
     return (
       <AuthPage
@@ -16,7 +42,16 @@ function App() {
         goToLogin={() => setPage("login")}
         goToSignup={() => setPage("signup")}
         goHome={() => setPage("landing")}
-        onSuccess={() => setPage("roles")}
+        onSuccess={async () => {
+          const { data } = await supabase.auth.getUser()
+
+          if (data?.user) {
+            setIsAuthenticated(true)
+            setUserName(data.user.user_metadata?.full_name || "")
+          }
+
+          setPage("roles")
+        }}
       />
     )
   }
@@ -24,10 +59,14 @@ function App() {
   if (page === "roles") {
     return (
       <RoleSelection
+        userName={userName}
+        isAuthenticated={isAuthenticated}
         onEnter={(selectedRole) => {
           setRole(selectedRole)
           setPage("dashboard")
         }}
+        onLogout={handleLogout}
+        onBack={() => setPage("landing")}
       />
     )
   }
@@ -36,10 +75,14 @@ function App() {
     return (
       <RoleDashboard
         role={role}
+        isAuthenticated={isAuthenticated}
+        userName={userName}
+        onLogout={handleLogout}
         onOpen={(gemName) => {
           setSelectedGem(gemName)
           setPage("gem")
         }}
+        onBack={() => setPage("roles")}
       />
     )
   }
@@ -50,51 +93,72 @@ function App() {
         role={role}
         gem={selectedGem}
         onBack={() => setPage("dashboard")}
+      isAuthenticated={isAuthenticated}
+      userName={userName}
+      onLogout={handleLogout}
       />
     )
   }
 
   return (
-  <LandingPage 
-  onStart={() => setPage("roles")} 
-  goLogin={() => setPage("login")}
-  goSignup={() => setPage("signup")}
-  />
+    <LandingPage
+      onStart={() => setPage("roles")}
+      goLogin={() => setPage("login")}
+      goSignup={() => setPage("signup")}
+      isAuthenticated={isAuthenticated}
+      userName={userName}
+      onLogout={handleLogout}
+    />
   )
 }
 
 export default App
 
+function LandingPage({ 
+  onStart, 
+  goLogin, 
+  goSignup, 
+  isAuthenticated, 
+  userName, 
+  onLogout 
+}) {
 
-/* ---------------- Landing ---------------- */
-
-function LandingPage({ onStart, goLogin, goSignup }) {
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-teal-100">
 
-      <div className="flex justify-between items-center px-8 py-4">
+      <div className="flex justify-between items-center px-8 py-4 relative">
 
         <h1 className="text-2xl font-bold text-emerald-700">
           BioGenie
         </h1>
 
-        <div className="flex gap-3">
+        {!isAuthenticated ? (
 
-          <button
-            onClick={goLogin}
-            className="px-4 py-2 rounded-lg border border-emerald-600 text-emerald-700 hover:bg-emerald-50 transition"
-          >
-            Sign In
-          </button>
+          <div className="flex gap-3">
+            <button
+              onClick={goLogin}
+              className="px-4 py-2 rounded-lg border border-emerald-600 text-emerald-700 hover:bg-emerald-50 transition"
+            >
+              Sign In
+            </button>
 
-          <button
-            onClick={goSignup}
-            className="px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition"
-          >
-            Sign Up
-          </button>
+            <button
+              onClick={goSignup}
+              className="px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition"
+            >
+              Sign Up
+            </button>
+          </div>
 
-        </div>
+        ) : (
+
+          <ProfileDropdown
+            userName={userName}
+            onLogout={onLogout}
+          />
+
+        )}
+
       </div>
 
       <div className="flex flex-col items-center justify-center text-center px-6 py-24">
@@ -120,8 +184,49 @@ function LandingPage({ onStart, goLogin, goSignup }) {
   )
 }
 
+function ProfileDropdown({ userName, onLogout }) {
+  const [open, setOpen] = useState(false)
 
-      
+  const firstLetter = userName ? userName.charAt(0).toUpperCase() : "U"
+
+  return (
+    <div className="relative flex justify-end">
+      <button
+        onClick={() => setOpen(!open)}
+        className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition"
+      >
+        <div className="w-7 h-7 bg-white text-emerald-600 rounded-full flex items-center justify-center text-sm font-bold">
+          {firstLetter}
+        </div>
+
+        <span>{userName}</span>
+        <span className="text-sm">▾</span>
+      </button>
+
+      {open && (
+        <div className="absolute right-0 mt-2 w-48 bg-white shadow-2xl rounded-xl border border-gray-200">
+          <div className="px-4 py-3 text-sm border-b text-gray-600">
+            Signed in as
+            <div className="font-semibold text-gray-800">
+              {userName}
+            </div>
+          </div>
+
+          <button
+            onClick={onLogout}
+            className="w-full text-left px-4 py-3 hover:bg-gray-100 text-red-600"
+          >
+            Logout
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+
+
+
 
 // ================= AUTH PAGE =================
 
@@ -133,19 +238,50 @@ function AuthPage({ mode, goToLogin, goToSignup, goHome, onSuccess }) {
   const [error, setError] = useState("")
 
 
-  const handleSubmit = () => {
-    if (!email || !password || (mode === "signup" && !fullName)) {
-      setError("Please fill all fields")
-      return
-    }
+  const handleSubmit = async () => {
+
+  if (!email || !password || (mode === "signup" && !fullName)) {
+    setError("Please fill all fields")
+    return
+  }
+
+  try {
 
     if (mode === "signup") {
-      alert("Account created successfully!")
+
+      const { error } = await supabase.auth.signUp({
+        email: email,
+        password: password,
+        options: {
+          data: {
+            full_name: fullName
+          }
+        }
+      })
+
+      if (error) throw error
+
+      alert("Account created successfully! Please login.")
       goToLogin()
-    } else {
+    }
+
+    if (mode === "login") {
+
+      const { error } = await supabase.auth.signInWithPassword({
+        email: email,
+        password: password
+      })
+
+      if (error) throw error
+
       onSuccess()
     }
+
+  } catch (err) {
+    setError(err.message)
   }
+}
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-teal-100 flex items-center justify-center">
@@ -224,14 +360,38 @@ function AuthPage({ mode, goToLogin, goToSignup, goHome, onSuccess }) {
 
 /* ---------------- Role Selection ---------------- */
 
-function RoleSelection({ onEnter }) {
+function RoleSelection({ onEnter, userName, isAuthenticated, onLogout, onBack }) {
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-teal-100 p-10">
 
-      <h2 className="text-4xl font-bold text-center text-emerald-700 mb-12">
-        Choose Your Role
-      </h2>
+      {/* ---------- TOP BAR ---------- */}
+      <div className="flex justify-between items-center mb-8">
 
+        {/* LEFT SIDE */}
+        <div className="flex items-center gap-4">
+          <button
+            onClick={onBack}
+            className="bg-white px-4 py-2 rounded-lg shadow hover:bg-gray-100 transition"
+          >
+            ← Back
+          </button>
+
+          <h2 className="text-4xl font-bold text-emerald-700">
+            Choose Your Role
+          </h2>
+        </div>
+
+        {/* RIGHT SIDE */}
+        {isAuthenticated && (
+          <ProfileDropdown
+            userName={userName}
+            onLogout={onLogout}
+          />
+        )}
+
+      </div>
+
+      {/* ---------- ROLE GRID ---------- */}
       <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
 
         <RoleCard
@@ -268,6 +428,7 @@ function RoleSelection({ onEnter }) {
 }
 
 
+
 /* ---------------- Role Card ---------------- */
 
 function RoleCard({ title, desc, img, onClick }) {
@@ -294,7 +455,7 @@ function RoleCard({ title, desc, img, onClick }) {
 
 /* ---------------- Dashboard ---------------- */
 
-function RoleDashboard({ role, onOpen }) {
+function RoleDashboard({ role, onOpen, onBack, isAuthenticated, onLogout, userName }) {
 
   const dashboards = {
 
@@ -343,10 +504,27 @@ function RoleDashboard({ role, onOpen }) {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-teal-100 p-10">
+    <div className="flex items-center gap-4">
+    <button
+      onClick={onBack}
+      className="bg-white px-4 py-2 rounded-lg shadow hover:bg-gray-100 transition"
+    >
+      ← Back
+    </button>
 
-      <h2 className="text-4xl font-bold text-center text-emerald-700 mb-12">
-        {role?.toUpperCase()} DASHBOARD
-      </h2>
+    <h2 className="text-4xl font-bold text-emerald-700">
+      {role?.toUpperCase()} DASHBOARD
+    </h2>
+  </div>
+
+  {isAuthenticated && (
+    <ProfileDropdown
+      userName={userName}
+      onLogout={onLogout}
+    />
+  )}
+      
+
 
       <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
 
@@ -381,7 +559,7 @@ function RoleDashboard({ role, onOpen }) {
 
 /* ---------------- Gem Screen ---------------- */
 
-function GemScreen({ role, gem, onBack }) {
+function GemScreen({ role, gem, onBack, isAuthenticated, userName, onLogout }) {
 
   const [messages, setMessages] = useState([
     { sender: "bot", text: `Welcome to ${gem}! Ask me anything.` }
@@ -405,23 +583,37 @@ function GemScreen({ role, gem, onBack }) {
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-teal-100 p-6 flex flex-col">
 
-      {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <button
-          onClick={onBack}
-          className="bg-white px-4 py-2 rounded-lg shadow"
-        >
-          ← Back
-        </button>
+      {/* ---------- HEADER ---------- */}
+<div className="w-full flex items-center mb-6">
 
-        <h2 className="text-2xl font-bold text-emerald-700">
-          {gem}
-        </h2>
+  {/* LEFT SIDE */}
+  <div className="flex items-center gap-4">
+    <button
+      onClick={onBack}
+      className="bg-white px-4 py-2 rounded-lg shadow hover:bg-gray-100 transition"
+    >
+      ← Back
+    </button>
 
-        <div></div>
-      </div>
+    <h2 className="text-2xl font-bold text-emerald-700">
+      {gem}
+    </h2>
+  </div>
 
-      {/* Chat Box */}
+  {/* RIGHT SIDE */}
+  {isAuthenticated && (
+    <div className="ml-auto flex items-center">
+      <ProfileDropdown
+        userName={userName}
+        onLogout={onLogout}
+      />
+    </div>
+  )}
+
+</div>
+
+
+      {/* ---------- CHAT BOX ---------- */}
       <div className="flex-1 bg-white rounded-2xl shadow p-4 overflow-y-auto mb-4">
 
         {messages.map((msg, i) => (
@@ -445,7 +637,7 @@ function GemScreen({ role, gem, onBack }) {
 
       </div>
 
-      {/* Input */}
+      {/* ---------- INPUT ---------- */}
       <div className="flex gap-2">
         <input
           value={input}
