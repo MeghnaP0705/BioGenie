@@ -1,4 +1,5 @@
 import { useState } from "react"
+
 function App() {
 
   const [page, setPage] = useState("landing")
@@ -8,6 +9,18 @@ function App() {
 
   /* -------- ROUTING LOGIC -------- */
 //comment
+  if (page === "signup" || page === "login") {
+    return (
+      <AuthPage
+        mode={page}
+        goToLogin={() => setPage("login")}
+        goToSignup={() => setPage("signup")}
+        goHome={() => setPage("landing")}
+        onSuccess={() => setPage("roles")}
+      />
+    )
+  }
+
   if (page === "roles") {
     return (
       <RoleSelection
@@ -41,7 +54,13 @@ function App() {
     )
   }
 
-  return <LandingPage onStart={() => setPage("roles")} />
+  return (
+  <LandingPage 
+  onStart={() => setPage("roles")} 
+  goLogin={() => setPage("login")}
+  goSignup={() => setPage("signup")}
+  />
+  )
 }
 
 export default App
@@ -49,31 +68,27 @@ export default App
 
 /* ---------------- Landing ---------------- */
 
-function LandingPage({ onStart }) {
+function LandingPage({ onStart, goLogin, goSignup }) {
   return (
-
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-teal-100">
 
-      {/* ---------- NAVBAR ---------- */}
       <div className="flex justify-between items-center px-8 py-4">
 
-        {/* Logo */}
         <h1 className="text-2xl font-bold text-emerald-700">
           BioGenie
         </h1>
 
-        {/* Auth Buttons */}
         <div className="flex gap-3">
 
           <button
-            onClick={() => alert("Sign In page will come later")}
+            onClick={goLogin}
             className="px-4 py-2 rounded-lg border border-emerald-600 text-emerald-700 hover:bg-emerald-50 transition"
           >
             Sign In
           </button>
 
           <button
-            onClick={() => alert("Sign Up page will come later")}
+            onClick={goSignup}
             className="px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition"
           >
             Sign Up
@@ -82,8 +97,6 @@ function LandingPage({ onStart }) {
         </div>
       </div>
 
-
-      {/* ---------- HERO SECTION ---------- */}
       <div className="flex flex-col items-center justify-center text-center px-6 py-24">
 
         <h1 className="text-6xl font-bold text-emerald-700 mb-6">
@@ -95,7 +108,6 @@ function LandingPage({ onStart }) {
           teachers, and the public. Curriculum aligned and rural friendly.
         </p>
 
-        {/* Guest Mode */}
         <button
           onClick={onStart}
           className="bg-emerald-600 text-white px-10 py-4 rounded-xl text-lg shadow-lg hover:bg-emerald-700 transition"
@@ -104,12 +116,111 @@ function LandingPage({ onStart }) {
         </button>
 
       </div>
-
     </div>
   )
 }
 
 
+      
+
+// ================= AUTH PAGE =================
+
+function AuthPage({ mode, goToLogin, goToSignup, goHome, onSuccess }) {
+
+  const [fullName, setFullName] = useState("")
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [error, setError] = useState("")
+
+
+  const handleSubmit = () => {
+    if (!email || !password || (mode === "signup" && !fullName)) {
+      setError("Please fill all fields")
+      return
+    }
+
+    if (mode === "signup") {
+      alert("Account created successfully!")
+      goToLogin()
+    } else {
+      onSuccess()
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-teal-100 flex items-center justify-center">
+
+      <div className="bg-white p-10 rounded-2xl shadow-xl w-[420px]">
+
+        <button onClick={goHome} className="text-sm text-gray-500 mb-4">
+          ← Back
+        </button>
+
+        <h2 className="text-3xl font-bold text-emerald-700 text-center mb-8">
+          {mode === "signup" ? "Create Account" : "Welcome Back"}
+        </h2>
+
+        {mode === "signup" && (
+          <input
+            type="text"
+            placeholder="Full Name"
+            className="w-full p-3 border rounded-lg mb-4"
+            value={fullName}
+            onChange={(e) => setFullName(e.target.value)}
+          />
+        )}
+
+        <input
+          type="email"
+          placeholder="Email"
+          className="w-full p-3 border rounded-lg mb-4"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
+
+        <input
+          type="password"
+          placeholder="Password"
+          className="w-full p-3 border rounded-lg mb-6"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
+
+        {error && (
+          <p className="text-red-500 text-sm mb-4 text-center">
+            {error}
+          </p>
+        )}
+
+        <button
+          onClick={handleSubmit}
+          className="w-full bg-emerald-600 text-white py-3 rounded-lg hover:bg-emerald-700 transition"
+        >
+          {mode === "signup" ? "Sign Up" : "Sign In"}
+        </button>
+
+        <div className="text-center mt-6 text-sm">
+          {mode === "signup" ? (
+            <>
+              Already have an account?{" "}
+              <span onClick={goToLogin} className="text-emerald-600 cursor-pointer">
+                Sign In
+              </span>
+            </>
+          ) : (
+            <>
+              Don't have an account?{" "}
+              <span onClick={goToSignup} className="text-emerald-600 cursor-pointer">
+                Sign Up
+              </span>
+            </>
+          )}
+        </div>
+
+      </div>
+    </div>
+  )
+}
 
 /* ---------------- Role Selection ---------------- */
 
@@ -354,4 +465,3 @@ function GemScreen({ role, gem, onBack }) {
     </div>
   )
 }
-
