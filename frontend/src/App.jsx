@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react"
 import { supabase } from "./supabase"
+import BiotechSimulations from "./components/BiotechSimulations"
+import VirtualLabs from './components/VirtualLabs'; 
 
 function App() {
 
@@ -731,103 +733,23 @@ function RoleDashboard({ role, onOpen, onBack, isAuthenticated, onLogout, userNa
 }
 
 
-/* ---------------- Gem Screen ---------------- */
-
 function GemScreen({ role, gem, onBack, isAuthenticated, userName, onLogout }) {
-
-  const [messages, setMessages] = useState([
-    { sender: "bot", text: `Welcome to ${gem}! Ask me anything.` }
-  ])
-
-  const [input, setInput] = useState("")
-
-  const sendMessage = () => {
-    if (!input.trim()) return
-
-    const newMessages = [
-      ...messages,
-      { sender: "user", text: input },
-      { sender: "bot", text: "AI response will come here later 🤖" }
-    ]
-
-    setMessages(newMessages)
-    setInput("")
-  }
+  // ... existing code ...
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-teal-100 p-6 flex flex-col">
-
-      {/* ---------- HEADER ---------- */}
-<div className="w-full flex items-center mb-6">
-
-  {/* LEFT SIDE */}
-  <div className="flex items-center gap-4">
-    <button
-      onClick={onBack}
-      className="bg-white px-4 py-2 rounded-lg shadow hover:bg-gray-100 transition"
-    >
-      ← Back
-    </button>
-
-    <h2 className="text-2xl font-bold text-emerald-700">
-      {gem}
-    </h2>
-  </div>
-
-  {/* RIGHT SIDE */}
-  {isAuthenticated && (
-    <div className="ml-auto flex items-center">
-      <ProfileDropdown
-        userName={userName}
-        onLogout={onLogout}
-      />
+      {/* HEADER */}
+      {/* ... */}
+      
+      {/* CONDITIONAL RENDERING */}
+      {gem === "Biotech Simulations" ? <BiotechSimulations /> : 
+      gem === "Virtual Lab Experiments" ? <VirtualLabs /> : (
+        // chat messages div
+        <div className="flex-1 bg-white rounded-2xl shadow p-4 overflow-y-auto mb-4">
+          {/* ... messages ... */}
+        </div>
+      )}
+      {/* ... input ... */}
     </div>
-  )}
-
-</div>
-
-
-      {/* ---------- CHAT BOX ---------- */}
-      <div className="flex-1 bg-white rounded-2xl shadow p-4 overflow-y-auto mb-4">
-
-        {messages.map((msg, i) => (
-          <div
-            key={i}
-            className={`mb-3 flex ${
-              msg.sender === "user" ? "justify-end" : "justify-start"
-            }`}
-          >
-            <div
-              className={`px-4 py-2 rounded-xl max-w-xs ${
-                msg.sender === "user"
-                  ? "bg-emerald-600 text-white"
-                  : "bg-gray-100 text-gray-800"
-              }`}
-            >
-              {msg.text}
-            </div>
-          </div>
-        ))}
-
-      </div>
-
-      {/* ---------- INPUT ---------- */}
-      <div className="flex gap-2">
-        <input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder={`Ask something in ${gem}...`}
-          className="flex-1 p-3 rounded-xl border"
-        />
-
-        <button
-          onClick={sendMessage}
-          className="bg-emerald-600 text-white px-6 rounded-xl"
-        >
-          Send
-        </button>
-      </div>
-
-    </div>
-  )
+  );
 }
