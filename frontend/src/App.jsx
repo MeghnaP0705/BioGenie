@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { supabase } from "./supabase"
 import BiotechSimulations from "./components/BiotechSimulations"
 import VirtualLabs from './components/VirtualLabs'; 
@@ -11,42 +11,44 @@ function App() {
   const [selectedGem, setSelectedGem] = useState(null)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
 
-  // ✅ AUTO RESTORE SESSION ON LOAD
-useEffect(() => {
+  // ✅ AUTH + PASSWORD RECOVERY HANDLER (FIXED)
+  useEffect(() => {
+    const initAuth = async () => {
+      const hash = window.location.hash
 
-  const checkSession = async () => {
+      // 🔐 PASSWORD RECOVERY HAS ABSOLUTE PRIORITY
+      if (hash && hash.includes("type=recovery")) {
+        setIsAuthenticated(false)
+        setPage("updatePassword")
+        return
+      }
 
-    const { data: { session } } = await supabase.auth.getSession()
+      // 🔑 NORMAL SESSION RESTORE
+      const { data } = await supabase.auth.getSession()
 
-    // If user is logged in normally
-    if (session?.user) {
-      setIsAuthenticated(true)
-      setUserName(session.user.user_metadata?.full_name || "")
+      if (data?.session?.user) {
+        setIsAuthenticated(true)
+        setUserName(
+          data.session.user.user_metadata?.full_name || ""
+        )
+        setPage("roles")
+      }
     }
 
-    // Detect password recovery session
-    if (session && window.location.hash.includes("type=recovery")) {
-      setPage("updatePassword")
-    }
-
-  }
-
-  checkSession()
-
-}, [])
-
+    initAuth()
+  }, [])
 
   // ✅ LOGOUT
   const handleLogout = async () => {
     await supabase.auth.signOut()
     setIsAuthenticated(false)
     setUserName("")
-    setPage("landing")
     setRole(null)
     setSelectedGem(null)
+    setPage("landing")
   }
 
-  /* -------- ROUTING LOGIC -------- */
+  /* ---------------- ROUTING ---------------- */
 
   if (page === "signup" || page === "login") {
     return (
@@ -55,35 +57,32 @@ useEffect(() => {
         goToLogin={() => setPage("login")}
         goToSignup={() => setPage("signup")}
         goHome={() => setPage("landing")}
+        goToReset={() => setPage("reset")}
         onSuccess={async () => {
           const { data } = await supabase.auth.getUser()
-
-          if (data?.user) {
-            setIsAuthenticated(true)
-            setUserName(data.user.user_metadata?.full_name || "")
-          }
-
+          setIsAuthenticated(true)
+          setUserName(data.user.user_metadata?.full_name || "")
           setPage("roles")
         }}
-        goToReset={() => setPage("reset")} 
       />
     )
   }
 
   if (page === "reset") {
-  return (
-    <ResetPasswordPage
-      goToLogin={() => setPage("login")}
-    />
-  )
-}
+    return <ResetPasswordPage goBack={() => setPage("login")} />
+  }
+
+  // ✅ 🔥 THIS IS THE FIX YOU WERE ASKING ABOUT 🔥
   if (page === "updatePassword") {
-  return (
-    <UpdatePasswordPage
-      goToLogin={() => setPage("login")}
-    />
-  )
-}
+    return (
+      <UpdatePassword
+        onDone={() => {
+          window.location.hash = "" // 🔥 VERY IMPORTANT
+          setPage("login")
+        }}
+      />
+    )
+  }
 
   if (page === "roles") {
     return (
@@ -107,8 +106,8 @@ useEffect(() => {
         isAuthenticated={isAuthenticated}
         userName={userName}
         onLogout={handleLogout}
-        onOpen={(gemName) => {
-          setSelectedGem(gemName)
+        onOpen={(gem) => {
+          setSelectedGem(gem)
           setPage("gem")
         }}
         onBack={() => setPage("roles")}
@@ -122,9 +121,9 @@ useEffect(() => {
         role={role}
         gem={selectedGem}
         onBack={() => setPage("dashboard")}
-      isAuthenticated={isAuthenticated}
-      userName={userName}
-      onLogout={handleLogout}
+        isAuthenticated={isAuthenticated}
+        userName={userName}
+        onLogout={handleLogout}
       />
     )
   }
@@ -142,6 +141,8 @@ useEffect(() => {
 }
 
 export default App
+
+
 
 function LandingPage({ 
   onStart, 
@@ -205,8 +206,9 @@ function LandingPage({
           onClick={onStart}
           className="bg-emerald-600 text-white px-10 py-4 rounded-xl text-lg shadow-lg hover:bg-emerald-700 transition"
         >
-          Continue as Guest
+          {isAuthenticated ? "Go to Dashboard" : "Continue as Guest"}
         </button>
+
 
       </div>
     </div>
@@ -214,12 +216,30 @@ function LandingPage({
 }
 
 function ProfileDropdown({ userName, onLogout }) {
+
   const [open, setOpen] = useState(false)
+  const dropdownRef = useRef(null)
 
   const firstLetter = userName ? userName.charAt(0).toUpperCase() : "U"
 
+  // ✅ CLOSE DROPDOWN WHEN CLICKING OUTSIDE
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setOpen(false)
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside)
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside)
+    }
+  }, [])
+
   return (
-    <div className="relative flex justify-end">
+    <div ref={dropdownRef} className="relative z-50">
+
       <button
         onClick={() => setOpen(!open)}
         className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition"
@@ -234,6 +254,7 @@ function ProfileDropdown({ userName, onLogout }) {
 
       {open && (
         <div className="absolute right-0 mt-2 w-48 bg-white shadow-2xl rounded-xl border border-gray-200">
+
           <div className="px-4 py-3 text-sm border-b text-gray-600">
             Signed in as
             <div className="font-semibold text-gray-800">
@@ -247,11 +268,13 @@ function ProfileDropdown({ userName, onLogout }) {
           >
             Logout
           </button>
+
         </div>
       )}
     </div>
   )
 }
+
 
 
 
@@ -410,7 +433,7 @@ function ResetPasswordPage({ goBack }) {
     }
 
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: "http://localhost:5173"
+      redirectTo: "http://localhost:5173/reset-password"
     })
 
     if (error) {
@@ -466,29 +489,27 @@ function ResetPasswordPage({ goBack }) {
   )
 }
 
-function UpdatePasswordPage({ goToLogin }) {
-
-  const [newPassword, setNewPassword] = useState("")
-  const [message, setMessage] = useState("")
+function UpdatePassword({ onDone }) {
+  const [password, setPassword] = useState("")
   const [error, setError] = useState("")
+  const [success, setSuccess] = useState(false)
 
   const handleUpdate = async () => {
-    if (!newPassword) {
+    if (!password) {
       setError("Please enter a new password")
       return
     }
 
     const { error } = await supabase.auth.updateUser({
-      password: newPassword
+      password: password
     })
 
     if (error) {
       setError(error.message)
     } else {
-      setError("")
-      setMessage("Password updated successfully! Please login.")
+      setSuccess(true)
       setTimeout(() => {
-        goToLogin()
+        onDone()
       }, 2000)
     }
   }
@@ -498,16 +519,16 @@ function UpdatePasswordPage({ goToLogin }) {
 
       <div className="bg-white p-10 rounded-2xl shadow-xl w-[420px]">
 
-        <h2 className="text-3xl font-bold text-emerald-700 text-center mb-8">
+        <h2 className="text-3xl font-bold text-emerald-700 text-center mb-6">
           Set New Password
         </h2>
 
         <input
           type="password"
-          placeholder="Enter new password"
+          placeholder="New Password"
           className="w-full p-3 border rounded-lg mb-4"
-          value={newPassword}
-          onChange={(e) => setNewPassword(e.target.value)}
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
         />
 
         {error && (
@@ -516,9 +537,9 @@ function UpdatePasswordPage({ goToLogin }) {
           </p>
         )}
 
-        {message && (
+        {success && (
           <p className="text-green-600 text-sm mb-4 text-center">
-            {message}
+            Password updated successfully!
           </p>
         )}
 
@@ -533,6 +554,7 @@ function UpdatePasswordPage({ goToLogin }) {
     </div>
   )
 }
+
 
 /* ---------------- Role Selection ---------------- */
 
